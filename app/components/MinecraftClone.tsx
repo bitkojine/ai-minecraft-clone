@@ -121,6 +121,74 @@ function generateHouse(centerX: number, centerZ: number) {
   return house;
 }
 
+function DancingMonkey({ position }: { position: [number, number, number] }) {
+  const monkeyRef = useRef<THREE.Group>(null);
+
+  useFrame(({ clock }) => {
+    if (monkeyRef.current) {
+      const t = clock.getElapsedTime();
+      monkeyRef.current.position.y = position[1] + Math.sin(t * 5) * 0.5; // Bob up and down
+      monkeyRef.current.rotation.y = Math.sin(t * 2) * 0.5; // Rotate side to side
+
+      // Animate arms
+      const leftArm = monkeyRef.current.getObjectByName('leftArm');
+      const rightArm = monkeyRef.current.getObjectByName('rightArm');
+      if (leftArm && rightArm) {
+        leftArm.rotation.x = Math.sin(t * 10) * 0.5;
+        rightArm.rotation.x = Math.sin(t * 10 + Math.PI) * 0.5;
+      }
+
+      // Animate legs
+      const leftLeg = monkeyRef.current.getObjectByName('leftLeg');
+      const rightLeg = monkeyRef.current.getObjectByName('rightLeg');
+      if (leftLeg && rightLeg) {
+        leftLeg.rotation.x = Math.sin(t * 10) * 0.3;
+        rightLeg.rotation.x = Math.sin(t * 10 + Math.PI) * 0.3;
+      }
+    }
+  });
+
+  return (
+    <group ref={monkeyRef} position={position}>
+      {/* Body */}
+      <Box args={[0.8, 1, 0.5]} position={[0, 0.5, 0]}>
+        <meshStandardMaterial color="#8B4513" />
+      </Box>
+      {/* Head */}
+      <Box args={[0.6, 0.6, 0.6]} position={[0, 1.3, 0]}>
+        <meshStandardMaterial color="#8B4513" />
+      </Box>
+      {/* Left Arm */}
+      <Box args={[0.2, 0.7, 0.2]} position={[-0.5, 0.5, 0]} name="leftArm">
+        <meshStandardMaterial color="#8B4513" />
+      </Box>
+      {/* Right Arm */}
+      <Box args={[0.2, 0.7, 0.2]} position={[0.5, 0.5, 0]} name="rightArm">
+        <meshStandardMaterial color="#8B4513" />
+      </Box>
+      {/* Left Leg */}
+      <Box args={[0.2, 0.7, 0.2]} position={[-0.3, -0.35, 0]} name="leftLeg">
+        <meshStandardMaterial color="#8B4513" />
+      </Box>
+      {/* Right Leg */}
+      <Box args={[0.2, 0.7, 0.2]} position={[0.3, -0.35, 0]} name="rightLeg">
+        <meshStandardMaterial color="#8B4513" />
+      </Box>
+      {/* Eyes */}
+      <Box args={[0.1, 0.1, 0.1]} position={[-0.15, 1.4, 0.3]}>
+        <meshStandardMaterial color="white" />
+      </Box>
+      <Box args={[0.1, 0.1, 0.1]} position={[0.15, 1.4, 0.3]}>
+        <meshStandardMaterial color="white" />
+      </Box>
+      {/* Mouth */}
+      <Box args={[0.3, 0.05, 0.1]} position={[0, 1.2, 0.3]}>
+        <meshStandardMaterial color="black" />
+      </Box>
+    </group>
+  );
+}
+
 function FlatWorld() {
   const blocks: JSX.Element[] = [];
 
@@ -136,7 +204,24 @@ function FlatWorld() {
   const house = generateHouse(houseCenter[0], houseCenter[1]);
   blocks.push(...house);
 
-  return <>{blocks}</>;
+  // Add dancing monkeys
+  const monkeyPositions = [
+    [-10, 0, -10],
+    [10, 0, 10],
+    [-10, 0, 10],
+    [10, 0, -10],
+  ];
+
+  const monkeys = monkeyPositions.map((pos, index) => (
+    <DancingMonkey key={`monkey-${index}`} position={pos as [number, number, number]} />
+  ));
+
+  return (
+    <>
+      {blocks}
+      {monkeys}
+    </>
+  );
 }
 
 function FirstPersonCamera() {
