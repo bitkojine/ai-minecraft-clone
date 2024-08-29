@@ -121,16 +121,27 @@ function generateHouse(centerX: number, centerZ: number) {
   return house;
 }
 
-function DancingMonkey({ position }: { position: [number, number, number] }) {
+function DancingMonkey({ startPosition, patrolRadius = 5 }: { startPosition: [number, number, number]; patrolRadius?: number }) {
   const monkeyRef = useRef<THREE.Group>(null);
+  const timeOffset = useRef(Math.random() * Math.PI * 2); // Random start position in the patrol
 
   useFrame(({ clock }) => {
     if (monkeyRef.current) {
-      const t = clock.getElapsedTime();
-      monkeyRef.current.position.y = position[1] + Math.sin(t * 5) * 0.5; // Bob up and down
-      monkeyRef.current.rotation.y = Math.sin(t * 2) * 0.5; // Rotate side to side
+      const t = clock.getElapsedTime() + timeOffset.current;
+      const patrolSpeed = 0.5; // Adjust this to change patrol speed
+      
+      // Calculate patrol position
+      const patrolX = Math.sin(t * patrolSpeed) * patrolRadius;
+      const patrolZ = Math.cos(t * patrolSpeed) * patrolRadius;
+      
+      monkeyRef.current.position.x = startPosition[0] + patrolX;
+      monkeyRef.current.position.y = startPosition[1] + Math.sin(t * 5) * 0.2; // Small vertical bounce
+      monkeyRef.current.position.z = startPosition[2] + patrolZ;
 
-      // Animate arms
+      // Face the direction of movement
+      monkeyRef.current.rotation.y = Math.atan2(patrolX, patrolZ);
+
+      // Animate arms and legs
       const leftArm = monkeyRef.current.getObjectByName('leftArm');
       const rightArm = monkeyRef.current.getObjectByName('rightArm');
       if (leftArm && rightArm) {
@@ -138,7 +149,6 @@ function DancingMonkey({ position }: { position: [number, number, number] }) {
         rightArm.rotation.x = Math.sin(t * 10 + Math.PI) * 0.5;
       }
 
-      // Animate legs
       const leftLeg = monkeyRef.current.getObjectByName('leftLeg');
       const rightLeg = monkeyRef.current.getObjectByName('rightLeg');
       if (leftLeg && rightLeg) {
@@ -149,7 +159,7 @@ function DancingMonkey({ position }: { position: [number, number, number] }) {
   });
 
   return (
-    <group ref={monkeyRef} position={position}>
+    <group ref={monkeyRef} position={startPosition}>
       {/* Body */}
       <Box args={[0.8, 1, 0.5]} position={[0, 0.5, 0]}>
         <meshStandardMaterial color="#8B4513" />
@@ -204,16 +214,16 @@ function FlatWorld() {
   const house = generateHouse(houseCenter[0], houseCenter[1]);
   blocks.push(...house);
 
-  // Add dancing monkeys
+  // Add patrolling monkeys
   const monkeyPositions = [
-    [-10, 0, -10],
-    [10, 0, 10],
-    [-10, 0, 10],
-    [10, 0, -10],
+    [-20, 1, -20],
+    [20, 1, 20],
+    [-20, 1, 20],
+    [20, 1, -20],
   ];
 
   const monkeys = monkeyPositions.map((pos, index) => (
-    <DancingMonkey key={`monkey-${index}`} position={pos as [number, number, number]} />
+    <DancingMonkey key={`monkey-${index}`} startPosition={pos as [number, number, number]} patrolRadius={10} />
   ));
 
   return (
