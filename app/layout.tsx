@@ -5,6 +5,7 @@ import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { baseUrl } from './sitemap'
+import { Layout } from './components/Layout'
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -28,10 +29,11 @@ export default function RootLayout({
         GeistMono.variable
       )}
     >
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+      </head>
       <body className="antialiased">
-        <main className="flex-auto min-w-0 flex flex-col h-screen">
-          {children}
-        </main>
+        <Layout>{children}</Layout>
         <Analytics />
         <SpeedInsights />
       </body>

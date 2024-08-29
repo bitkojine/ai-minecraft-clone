@@ -35,7 +35,7 @@ export function CommitHistory() {
   }, [])
 
   return (
-    <div className="commit-history bg-gray-800 p-4 rounded-lg shadow-md">
+    <div className="commit-history bg-gray-800 p-4 rounded-lg shadow-md max-h-80 overflow-y-auto">
       <h2 className="text-lg font-semibold mb-3 text-green-400">Recent Commits</h2>
       <ul className="space-y-2">
         {commits.map((commit) => (
