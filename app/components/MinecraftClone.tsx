@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, Box, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
@@ -388,259 +388,72 @@ function FlatWorld() {
   );
 }
 
-interface TouchPosition {
-  x: number;
-  y: number;
-}
-
-function Documentation() {
-  return (
-    <div className="bg-white p-4 rounded-lg max-w-2xl max-h-[80vh] overflow-auto">
-      <h2 className="text-2xl font-bold mb-4">Documentation</h2>
-      <p>Here you can add your game's documentation...</p>
-      {/* Add more documentation content here */}
-    </div>
-  );
-}
-
-function CommitHistory() {
-  return (
-    <div className="bg-white p-4 rounded-lg max-w-2xl max-h-[80vh] overflow-auto">
-      <h2 className="text-2xl font-bold mb-4">Commit History</h2>
-      <ul>
-        <li>Commit 1: Initial setup</li>
-        <li>Commit 2: Added basic world generation</li>
-        <li>Commit 3: Implemented player movement</li>
-        {/* Add more commit history items here */}
-      </ul>
-    </div>
-  );
-}
-
-function Menu({ onClose }) {
-  const [showDocs, setShowDocs] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-
-  return (
-    <div className="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-4 rounded-lg">
-        <h2 className="text-xl font-bold mb-4">Menu</h2>
-        <div className="flex flex-col space-y-2">
-          <button 
-            className="bg-blue-500 text-white px-4 py-2 rounded"
-            onClick={() => setShowDocs(true)}
-          >
-            Documentation
-          </button>
-          <button 
-            className="bg-green-500 text-white px-4 py-2 rounded"
-            onClick={() => setShowHistory(true)}
-          >
-            Commit History
-          </button>
-          <button className="bg-yellow-500 text-white px-4 py-2 rounded">
-            About
-          </button>
-          <button
-            className="bg-red-500 text-white px-4 py-2 rounded"
-            onClick={onClose}
-          >
-            Close Menu
-          </button>
-        </div>
-      </div>
-      {showDocs && (
-        <div className="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
-          <Documentation />
-          <button
-            className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded"
-            onClick={() => setShowDocs(false)}
-          >
-            Close
-          </button>
-        </div>
-      )}
-      {showHistory && (
-        <div className="absolute top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
-          <CommitHistory />
-          <button
-            className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded"
-            onClick={() => setShowHistory(false)}
-          >
-            Close
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Controls({ onMove, onSprint, onJump, isMobile }) {
+function FirstPersonCamera() {
   const { camera } = useThree();
-  const moveDirection = useRef({ x: 0, z: 0 });
+  const moveForward = useRef(false);
+  const moveBackward = useRef(false);
+  const moveLeft = useRef(false);
+  const moveRight = useRef(false);
   const isSprinting = useRef(false);
-  const [touchStart, setTouchStart] = useState<TouchPosition | null>(null);
-  const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0 });
+
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    switch (event.code) {
+      case 'KeyW': moveForward.current = true; break;
+      case 'KeyS': moveBackward.current = true; break;
+      case 'KeyA': moveLeft.current = true; break;
+      case 'KeyD': moveRight.current = true; break;
+      case 'ShiftLeft': isSprinting.current = true; break;
+    }
+  }, []);
+
+  const handleKeyUp = useCallback((event: KeyboardEvent) => {
+    switch (event.code) {
+      case 'KeyW': moveForward.current = false; break;
+      case 'KeyS': moveBackward.current = false; break;
+      case 'KeyA': moveLeft.current = false; break;
+      case 'KeyD': moveRight.current = false; break;
+      case 'ShiftLeft': isSprinting.current = false; break;
+    }
+  }, []);
 
   useEffect(() => {
-    if (!isMobile) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        switch (e.code) {
-          case 'KeyW': moveDirection.current.z = -1; break;
-          case 'KeyS': moveDirection.current.z = 1; break;
-          case 'KeyA': moveDirection.current.x = -1; break;
-          case 'KeyD': moveDirection.current.x = 1; break;
-          case 'ShiftLeft': isSprinting.current = true; break;
-          case 'Space': onJump(); break;
-        }
-        onMove(moveDirection.current.x, moveDirection.current.z);
-        onSprint(isSprinting.current);
-      };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
-      const handleKeyUp = (e: KeyboardEvent) => {
-        switch (e.code) {
-          case 'KeyW':
-          case 'KeyS': moveDirection.current.z = 0; break;
-          case 'KeyA':
-          case 'KeyD': moveDirection.current.x = 0; break;
-          case 'ShiftLeft': isSprinting.current = false; break;
-        }
-        onMove(moveDirection.current.x, moveDirection.current.z);
-        onSprint(isSprinting.current);
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      window.addEventListener('keyup', handleKeyUp);
-
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-        window.removeEventListener('keyup', handleKeyUp);
-      };
-    }
-  }, [onMove, onSprint, onJump, isMobile]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    setTouchStart({ x: touch.clientX, y: touch.clientY });
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStart) return;
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - touchStart.x;
-    const deltaY = touch.clientY - touchStart.y;
-    const maxRadius = 50;
-    const distance = Math.min(Math.sqrt(deltaX * deltaX + deltaY * deltaY), maxRadius);
-    const angle = Math.atan2(deltaY, deltaX);
-    const x = Math.cos(angle) * distance / maxRadius;
-    const y = Math.sin(angle) * distance / maxRadius;
-    setJoystickPosition({ x, y });
-    onMove(x, -y);
-  };
-
-  const handleTouchEnd = () => {
-    setTouchStart(null);
-    setJoystickPosition({ x: 0, y: 0 });
-    onMove(0, 0);
-  };
-
-  return (
-    <>
-      {!isMobile && <PointerLockControls />}
-      {isMobile && (
-        <div className="absolute bottom-4 left-4">
-          <div
-            className="w-32 h-32 bg-gray-400 bg-opacity-50 rounded-full relative"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            <div
-              className="w-16 h-16 bg-gray-600 rounded-full absolute"
-              style={{
-                left: `calc(50% + ${joystickPosition.x * 32}px)`,
-                top: `calc(50% + ${joystickPosition.y * 32}px)`,
-                transform: 'translate(-50%, -50%)'
-              }}
-            />
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-function FirstPersonCamera({ moveDirection, isSprinting, isJumping }) {
-  const { camera } = useThree();
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [handleKeyDown, handleKeyUp]);
 
   useFrame(() => {
-    const direction = new THREE.Vector3(
-      moveDirection.x,
-      0,
-      moveDirection.z
-    ).applyEuler(camera.rotation);
+    const direction = new THREE.Vector3();
+    const frontVector = new THREE.Vector3(0, 0, Number(moveBackward.current) - Number(moveForward.current));
+    const sideVector = new THREE.Vector3(Number(moveLeft.current) - Number(moveRight.current), 0, 0);
 
-    const speed = MOVE_SPEED * (isSprinting ? SPRINT_MULTIPLIER : 1);
-    camera.position.add(direction.multiplyScalar(speed));
+    direction
+      .subVectors(frontVector, sideVector)
+      .normalize()
+      .multiplyScalar(MOVE_SPEED * (isSprinting.current ? SPRINT_MULTIPLIER : 1))
+      .applyEuler(camera.rotation);
 
-    if (isJumping) {
-      camera.position.y += 0.1;
-    }
+    camera.position.add(direction);
   });
 
   return null;
 }
 
 export default function MinecraftClone() {
-  const [moveDirection, setMoveDirection] = useState({ x: 0, z: 0 });
-  const [isSprinting, setIsSprinting] = useState(false);
-  const [isJumping, setIsJumping] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const handleMove = (x, z) => {
-    setMoveDirection({ x, z });
-  };
-
-  const handleSprint = (sprinting) => {
-    setIsSprinting(sprinting);
-  };
-
-  const handleJump = () => {
-    setIsJumping(true);
-    setTimeout(() => setIsJumping(false), 300);
-  };
-
-  const toggleMenu = () => {
-    setMenuOpen(!menuOpen);
-  };
-
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
-      <Canvas camera={{ position: [0, 5, 10], fov: 75 }}>
+    <div style={{ width: '100%', height: '100%' }}>
+      <Canvas camera={{ position: [0, 5, 10], fov: 75 }} style={{ width: '100%', height: '100%' }}>
         <SkyBox />
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={0.8} />
         <FlatWorld />
-        <FirstPersonCamera moveDirection={moveDirection} isSprinting={isSprinting} isJumping={isJumping} />
-        <Controls onMove={handleMove} onSprint={handleSprint} onJump={handleJump} isMobile={isMobile} />
+        <FirstPersonCamera />
+        <PointerLockControls />
       </Canvas>
-      <div
-        className="absolute top-4 right-4 bg-gray-700 text-white p-2 rounded-full cursor-pointer"
-        onClick={toggleMenu}
-      >
-        ☰
-      </div>
-      {menuOpen && <Menu onClose={toggleMenu} />}
     </div>
   );
 }

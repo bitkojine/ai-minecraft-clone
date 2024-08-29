@@ -20,8 +20,8 @@ const GameLogo = () => (
 
 export default function Page() {
   return (
-    <div className="flex flex-col h-screen">
-      <div className="p-4 bg-gray-100 dark:bg-gray-800 overflow-y-auto">
+    <div className="flex h-screen">
+      <div className="w-1/4 p-4 overflow-y-auto bg-gray-100 dark:bg-gray-800">
         <GameLogo />
         <h1 className="text-2xl font-semibold mb-4">Monke Craft</h1>
         <p className="mb-4 text-sm italic">
@@ -43,13 +43,14 @@ export default function Page() {
         </p>
         <h2 className="text-xl font-semibold mb-2">Controls</h2>
         <ul className="list-disc pl-5 mb-4">
-          <li>Touch and drag: Look around</li>
-          <li>Virtual joystick: Move</li>
-          <li>Sprint button: Move faster</li>
-          <li>Jump button: Jump</li>
+          <li>W, A, S, D: Move forward, left, backward, and right</li>
+          <li>Mouse: Look around</li>
+          <li>Left Shift: Sprint (move faster)</li>
+          <li>Click on the game area to capture mouse and enable look controls</li>
+          <li>Press ESC to release mouse control</li>
         </ul>
       </div>
-      <div className="flex-grow">
+      <div className="w-3/4 p-4">
         <MinecraftClone />
       </div>
     </div>
