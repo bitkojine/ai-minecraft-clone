@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useRef, useEffect, useMemo } from 'react';
-import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
-import { PointerLockControls, Box } from '@react-three/drei';
+import React, { useRef, useEffect, useMemo, useCallback } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { PointerLockControls, Box, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 
 const WORLD_SIZE = 100;
@@ -86,8 +86,8 @@ function Cube({ position, color = '#4caf50', isGrass = false }: { position: [num
 
 function generateHouse(centerX: number, centerZ: number) {
   const house: JSX.Element[] = [];
-  const houseSize = 5;
-  const houseHeight = 4;
+  const houseSize = 9;
+  const houseHeight = 6;
 
   // Floor
   for (let x = 0; x < houseSize; x++) {
@@ -99,7 +99,9 @@ function generateHouse(centerX: number, centerZ: number) {
   // Walls
   for (let y = 1; y < houseHeight; y++) {
     for (let x = 0; x < houseSize; x++) {
-      house.push(<Cube key={`wall-front-${x}-${y}`} position={[centerX + x, y, centerZ]} color="#D2B48C" />);
+      if (y !== 2 || (x !== 4 && x !== 5)) { // Leave space for door
+        house.push(<Cube key={`wall-front-${x}-${y}`} position={[centerX + x, y, centerZ]} color="#D2B48C" />);
+      }
       house.push(<Cube key={`wall-back-${x}-${y}`} position={[centerX + x, y, centerZ + houseSize - 1]} color="#D2B48C" />);
     }
     for (let z = 1; z < houseSize - 1; z++) {
@@ -116,7 +118,22 @@ function generateHouse(centerX: number, centerZ: number) {
   }
 
   // Door
-  house.push(<Cube key="door" position={[centerX + Math.floor(houseSize / 2), 1, centerZ]} color="#8B4513" />);
+  house.push(<Cube key="door-bottom" position={[centerX + 4, 1, centerZ]} color="#8B4513" />);
+  house.push(<Cube key="door-top" position={[centerX + 4, 2, centerZ]} color="#8B4513" />);
+  house.push(<Cube key="door-bottom-2" position={[centerX + 5, 1, centerZ]} color="#8B4513" />);
+  house.push(<Cube key="door-top-2" position={[centerX + 5, 2, centerZ]} color="#8B4513" />);
+
+  // Windows
+  const windowPositions = [
+    [2, 2, 0], [6, 2, 0], // Front windows
+    [2, 2, houseSize - 1], [6, 2, houseSize - 1], // Back windows
+    [0, 2, 2], [0, 2, 6], // Left windows
+    [houseSize - 1, 2, 2], [houseSize - 1, 2, 6] // Right windows
+  ];
+
+  windowPositions.forEach(([x, y, z], index) => {
+    house.push(<Cube key={`window-${index}`} position={[centerX + x, y, centerZ + z]} color="#87CEEB" />);
+  });
 
   return house;
 }
@@ -199,36 +216,173 @@ function DancingMonkey({ startPosition, patrolRadius = 5 }: { startPosition: [nu
   );
 }
 
-function FlatWorld() {
-  const blocks: JSX.Element[] = [];
+function SkyBox() {
+  const { scene } = useThree();
+  const sunMoonRef = useMemo(() => React.createRef<THREE.Mesh>(), []);
+  const directionalLightRef = useMemo(() => React.createRef<THREE.DirectionalLight>(), []);
+  const cloudsRef = useMemo(() => React.createRef<THREE.Mesh>(), []);
 
-  // Generate flat terrain with grass texture
-  for (let x = 0; x < WORLD_SIZE; x++) {
-    for (let z = 0; z < WORLD_SIZE; z++) {
-      blocks.push(<Cube key={`terrain-${x}-${z}`} position={[x - WORLD_SIZE/2, -0.5, z - WORLD_SIZE/2]} isGrass={true} />);
+  const cloudsMaterial = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      varying vec2 vUv;
+      float noise(vec2 st) {
+        return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+      }
+      void main() {
+        vec2 st = vUv * 10.0 + time * 0.05;
+        float n = smoothstep(0.4, 0.6, noise(st));
+        gl_FragColor = vec4(1.0, 1.0, 1.0, n * 0.3);
+      }
+    `,
+    transparent: true,
+  }), []);
+
+  const timeRef = useRef(0);
+  const skyColorRef = useRef(new THREE.Color());
+
+  useFrame(({ clock }) => {
+    const time = clock.getElapsedTime();
+    const dayDuration = 30;
+    const cycleProgress = (time % dayDuration) / dayDuration;
+
+    if (Math.abs(time - timeRef.current) > 0.1) {
+      timeRef.current = time;
+      updateSkyColor(cycleProgress);
+      updateLighting(cycleProgress);
     }
-  }
 
-  // Add house in the middle of the map
-  const houseCenter = [0, 0];
-  const house = generateHouse(houseCenter[0], houseCenter[1]);
-  blocks.push(...house);
+    updateSunMoonPosition(cycleProgress);
+    updateClouds(time);
+  });
 
-  // Add patrolling monkeys
-  const monkeyPositions = [
-    [-20, 1, -20],
-    [20, 1, 20],
-    [-20, 1, 20],
-    [20, 1, -20],
-  ];
+  const updateSkyColor = (cycleProgress: number) => {
+    if (cycleProgress < 0.25) { // Dawn
+      skyColorRef.current.setRGB(
+        0.53 + cycleProgress * 1.88,
+        0.81 + cycleProgress * 0.76,
+        0.92 + cycleProgress * 0.32
+      );
+    } else if (cycleProgress < 0.75) { // Day
+      skyColorRef.current.setRGB(0.68, 0.85, 0.9);
+    } else { // Dusk to Night
+      skyColorRef.current.setRGB(
+        Math.max(0.05, 0.68 - (cycleProgress - 0.75) * 2.52),
+        Math.max(0.05, 0.85 - (cycleProgress - 0.75) * 3.2),
+        Math.max(0.1, 0.9 - (cycleProgress - 0.75) * 3.2)
+      );
+    }
+    scene.background = skyColorRef.current;
+  };
 
-  const monkeys = monkeyPositions.map((pos, index) => (
-    <DancingMonkey key={`monkey-${index}`} startPosition={pos as [number, number, number]} patrolRadius={10} />
-  ));
+  const updateLighting = (cycleProgress: number) => {
+    if (directionalLightRef.current) {
+      const intensity = cycleProgress < 0.25 ? cycleProgress * 4 :
+                        cycleProgress < 0.75 ? 1 :
+                        Math.max(0.05, 1 - (cycleProgress - 0.75) * 4);
+      directionalLightRef.current.intensity = intensity;
+    }
+  };
+
+  const updateSunMoonPosition = (cycleProgress: number) => {
+    if (sunMoonRef.current && directionalLightRef.current) {
+      const angle = cycleProgress * Math.PI * 2;
+      const x = Math.cos(angle) * 100;
+      const y = Math.sin(angle) * 100;
+      sunMoonRef.current.position.set(x, y, 0);
+      directionalLightRef.current.position.set(x, y, 0);
+
+      if (sunMoonRef.current.material instanceof THREE.MeshBasicMaterial) {
+        sunMoonRef.current.material.color.setHex(cycleProgress < 0.5 ? 0xffff00 : 0xffffff);
+      }
+    }
+  };
+
+  const updateClouds = (time: number) => {
+    if (cloudsRef.current) {
+      cloudsMaterial.uniforms.time.value = time;
+    }
+  };
 
   return (
     <>
+      <Sphere ref={sunMoonRef} args={[5, 32, 32]} position={[0, 100, 0]}>
+        <meshBasicMaterial />
+      </Sphere>
+      <directionalLight ref={directionalLightRef} intensity={1} />
+      <Sphere ref={cloudsRef} args={[99, 64, 64]} rotation={[0, 0, Math.PI / 2]}>
+        <primitive object={cloudsMaterial} attach="material" />
+      </Sphere>
+    </>
+  );
+}
+
+function FlatWorld() {
+  const blocks = useMemo(() => {
+    const generatedBlocks: JSX.Element[] = [];
+    for (let x = 0; x < WORLD_SIZE; x++) {
+      for (let z = 0; z < WORLD_SIZE; z++) {
+        generatedBlocks.push(<Cube key={`terrain-${x}-${z}`} position={[x - WORLD_SIZE/2, -0.5, z - WORLD_SIZE/2]} isGrass={true} />);
+      }
+    }
+    return generatedBlocks;
+  }, []);
+
+  const house = useMemo(() => generateHouse(0, 0), []);
+
+  const monkeys = useMemo(() => {
+    const monkeyPositions = [
+      [-20, 1, -20],
+      [20, 1, 20],
+      [-20, 1, 20],
+      [20, 1, -20],
+    ];
+    return monkeyPositions.map((pos, index) => (
+      <DancingMonkey key={`monkey-${index}`} startPosition={pos as [number, number, number]} patrolRadius={10} />
+    ));
+  }, []);
+
+  const ambientLightRef = useRef<THREE.AmbientLight>(null);
+  const pointLightRef = useRef<THREE.PointLight>(null);
+
+  const timeRef = useRef(0);
+
+  useFrame(({ clock }) => {
+    const time = clock.getElapsedTime() * 1;
+    if (Math.abs(time - timeRef.current) > 0.1) {
+      timeRef.current = time;
+      const dayDuration = 30;
+      const cycleProgress = (time % dayDuration) / dayDuration;
+
+      // Adjust ambient light intensity
+      if (ambientLightRef.current) {
+        const baseIntensity = 0.2;
+        const variableIntensity = 0.3;
+        ambientLightRef.current.intensity = baseIntensity + Math.sin(cycleProgress * Math.PI * 2) * variableIntensity;
+      }
+
+      // Adjust point light intensity and color
+      if (pointLightRef.current) {
+        pointLightRef.current.intensity = 0.5 + Math.sin(cycleProgress * Math.PI * 2) * 0.5;
+        pointLightRef.current.color.setHSL(0.1, 1, 0.5 + Math.sin(cycleProgress * Math.PI * 2) * 0.5);
+      }
+    }
+  });
+
+  return (
+    <>
+      <ambientLight ref={ambientLightRef} intensity={0.5} />
+      <pointLight ref={pointLightRef} position={[0, 50, 0]} intensity={0.8} />
       {blocks}
+      {house}
       {monkeys}
     </>
   );
@@ -242,27 +396,27 @@ function FirstPersonCamera() {
   const moveRight = useRef(false);
   const isSprinting = useRef(false);
 
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    switch (event.code) {
+      case 'KeyW': moveForward.current = true; break;
+      case 'KeyS': moveBackward.current = true; break;
+      case 'KeyA': moveLeft.current = true; break;
+      case 'KeyD': moveRight.current = true; break;
+      case 'ShiftLeft': isSprinting.current = true; break;
+    }
+  }, []);
+
+  const handleKeyUp = useCallback((event: KeyboardEvent) => {
+    switch (event.code) {
+      case 'KeyW': moveForward.current = false; break;
+      case 'KeyS': moveBackward.current = false; break;
+      case 'KeyA': moveLeft.current = false; break;
+      case 'KeyD': moveRight.current = false; break;
+      case 'ShiftLeft': isSprinting.current = false; break;
+    }
+  }, []);
+
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      switch (event.code) {
-        case 'KeyW': moveForward.current = true; break;
-        case 'KeyS': moveBackward.current = true; break;
-        case 'KeyA': moveLeft.current = true; break;
-        case 'KeyD': moveRight.current = true; break;
-        case 'ShiftLeft': isSprinting.current = true; break;
-      }
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      switch (event.code) {
-        case 'KeyW': moveForward.current = false; break;
-        case 'KeyS': moveBackward.current = false; break;
-        case 'KeyA': moveLeft.current = false; break;
-        case 'KeyD': moveRight.current = false; break;
-        case 'ShiftLeft': isSprinting.current = false; break;
-      }
-    };
-
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
@@ -270,7 +424,7 @@ function FirstPersonCamera() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [handleKeyDown, handleKeyUp]);
 
   useFrame(() => {
     const direction = new THREE.Vector3();
@@ -292,7 +446,8 @@ function FirstPersonCamera() {
 export default function MinecraftClone() {
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      <Canvas camera={{ position: [0, 50, 50], fov: 75 }} style={{ width: '100%', height: '100%' }}>
+      <Canvas camera={{ position: [0, 5, 10], fov: 75 }} style={{ width: '100%', height: '100%' }}>
+        <SkyBox />
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} intensity={0.8} />
         <FlatWorld />
