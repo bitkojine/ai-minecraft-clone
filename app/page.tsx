@@ -1,4 +1,7 @@
 import { BlogPosts } from 'app/components/posts'
+import dynamic from 'next/dynamic'
+
+const MinecraftClone = dynamic(() => import('app/components/MinecraftClone'), { ssr: false })
 
 export default function Page() {
   return (
@@ -13,6 +16,10 @@ export default function Page() {
         early error detection ensures cleaner code, and my preference for dark
         mode, which eases long coding sessions by reducing eye strain.`}
       </p>
+      <div className="my-8">
+        <h2 className="mb-4 text-xl font-semibold">Minecraft Clone</h2>
+        <MinecraftClone />
+      </div>
       <div className="my-8">
         <BlogPosts />
       </div>
